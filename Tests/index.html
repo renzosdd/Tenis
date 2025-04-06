@@ -1,0 +1,1597 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tennis & Padel Uruguay</title>
+  <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    // 1. ErrorBoundary mejorado
+    class ErrorBoundary extends React.Component {
+      state = { hasError: false, error: null };
+      
+      static getDerivedStateFromError(error) { 
+        return { hasError: true, error }; 
+      }
+      
+      componentDidCatch(error, info) { 
+        console.error("Error:", error, info); 
+      }
+      
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div className="p-4 bg-red-100 text-red-700 rounded">
+              <h3 className="font-bold">Algo salió mal</h3>
+              <p>{this.state.error.message}</p>
+              <button 
+                onClick={() => window.location.reload()}
+                className="mt-2 bg-red-600 text-white px-3 py-1 rounded"
+              >
+                Recargar aplicación
+              </button>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    // 2. Sistema de notificaciones
+    const NotificationContext = React.createContext();
+
+    const NotificationProvider = ({ children }) => {
+      const [notifications, setNotifications] = React.useState([]);
+      
+      const addNotification = (message, type = 'info') => {
+        const id = Date.now();
+        setNotifications(prev => [...prev, { id, message, type }]);
+        setTimeout(() => {
+          setNotifications(prev => prev.filter(n => n.id !== id));
+        }, 5000);
+      };
+
+      return (
+        <NotificationContext.Provider value={{ addNotification }}>
+          {children}
+          <div className="fixed top-4 right-4 z-50 space-y-2">
+            {notifications.map(notif => (
+              <div 
+                key={notif.id} 
+                className={`p-3 rounded shadow-lg ${
+                  notif.type === 'error' ? 'bg-red-500' : 
+                  notif.type === 'success' ? 'bg-green-500' : 'bg-blue-500'
+                } text-white animate-fadeIn`}
+              >
+                {notif.message}
+              </div>
+            ))}
+          </div>
+        </NotificationContext.Provider>
+      );
+    };
+
+    const useNotification = () => React.useContext(NotificationContext);
+
+    // 3. Componente Modal mejorado
+    const Modal = ({ isOpen, onClose, onConfirm, title, children }) => {
+      if (!isOpen) return null;
+      
+      return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="p-4 border-b">
+              <h3 className="text-lg font-semibold">{title}</h3>
+            </div>
+            <div className="p-4">
+              {children}
+            </div>
+            <div className="p-4 border-t flex justify-end space-x-2">
+              <button 
+                onClick={onClose} 
+                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={onConfirm} 
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // 4. Sistema de autenticación
+    const AuthContext = React.createContext();
+
+    const AuthProvider = ({ children }) => {
+      const [user, setUser] = React.useState(() => {
+        const savedUser = localStorage.getItem('user');
+        return savedUser ? JSON.parse(savedUser) : null;
+      });
+      
+      const login = (email, password) => {
+        // Simulación de login
+        const mockUser = { email, role: 'user' };
+        setUser(mockUser);
+        localStorage.setItem('user', JSON.stringify(mockUser));
+        return mockUser;
+      };
+      
+      const logout = () => {
+        setUser(null);
+        localStorage.removeItem('user');
+      };
+      
+      return (
+        <AuthContext.Provider value={{ user, login, logout }}>
+          {children}
+        </AuthContext.Provider>
+      );
+    };
+
+    const useAuth = () => {
+      const context = React.useContext(AuthContext);
+      if (!context) {
+        throw new Error('useAuth debe usarse dentro de un AuthProvider');
+      }
+      return context;
+    };
+
+    // 5. NavBar responsive con autenticación
+    const NavBar = () => {
+      const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+      const { user, logout } = useAuth();
+      
+      return (
+        <nav className="bg-blue-600 p-4 text-white">
+          <div className="container mx-auto flex justify-between items-center">
+            <h1 className="text-xl font-bold">Tennis & Padel Uruguay</h1>
+            
+            <div className="hidden md:flex items-center space-x-4">
+              <a href="#" className="hover:underline">Inicio</a>
+              <a href="#" className="hover:underline">Torneos</a>
+              <a href="#" className="hover:underline">Jugadores</a>
+              {user ? (
+                <div className="flex items-center space-x-2">
+                  <span>Hola, {user.email}</span>
+                  <button 
+                    onClick={logout}
+                    className="bg-red-500 text-white px-3 py-1 rounded text-sm"
+                  >
+                    Cerrar sesión
+                  </button>
+                </div>
+              ) : (
+                <a href="#login" className="hover:underline">Ingresar</a>
+              )}
+            </div>
+            
+            <button 
+              onClick={() => setIsMenuOpen(!isMenuOpen)} 
+              className="md:hidden text-white focus:outline-none"
+            >
+              ☰
+            </button>
+          </div>
+          
+          {isMenuOpen && (
+            <div className="md:hidden mt-2 space-y-2">
+              <a href="#" className="block py-1 hover:bg-blue-700 px-2 rounded">Inicio</a>
+              <a href="#" className="block py-1 hover:bg-blue-700 px-2 rounded">Torneos</a>
+              <a href="#" className="block py-1 hover:bg-blue-700 px-2 rounded">Jugadores</a>
+              {user ? (
+                <div className="pt-2 border-t">
+                  <p className="px-2 py-1">Sesión: {user.email}</p>
+                  <button 
+                    onClick={logout}
+                    className="w-full text-left py-1 hover:bg-blue-700 px-2 rounded"
+                  >
+                    Cerrar sesión
+                  </button>
+                </div>
+              ) : (
+                <a href="#login" className="block py-1 hover:bg-blue-700 px-2 rounded">Ingresar</a>
+              )}
+            </div>
+          )}
+        </nav>
+      );
+    };
+
+    // 6. LoginForm
+    const LoginForm = ({ onSuccess }) => {
+      const [form, setForm] = React.useState({ email: '', password: '' });
+      const { login } = useAuth();
+      const { addNotification } = useNotification();
+      
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        try {
+          const user = login(form.email, form.password);
+          addNotification(`Bienvenido ${user.email}`, 'success');
+          onSuccess?.();
+        } catch (error) {
+          addNotification('Error al iniciar sesión', 'error');
+        }
+      };
+      
+      return (
+        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md">
+          <h2 className="text-2xl font-bold mb-4">Iniciar sesión</h2>
+          <div className="mb-4">
+            <label className="block mb-1">Email:</label>
+            <input
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({...form, email: e.target.value})}
+              className="w-full p-2 border rounded"
+              required
+            />
+          </div>
+          <div className="mb-4">
+            <label className="block mb-1">Contraseña:</label>
+            <input
+              type="password"
+              value={form.password}
+              onChange={(e) => setForm({...form, password: e.target.value})}
+              className="w-full p-2 border rounded"
+              required
+            />
+          </div>
+          <button type="submit" className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+            Ingresar
+          </button>
+        </form>
+      );
+    };
+
+    // 7. PlayerForm
+    const PlayerForm = ({ onRegisterPlayer }) => {
+      const [name, setName] = React.useState("");
+      const [level, setLevel] = React.useState("A");
+      const [showModal, setShowModal] = React.useState(false);
+      const { addNotification } = useNotification();
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (name.trim().length < 3) {
+          addNotification('El nombre debe tener al menos 3 caracteres', 'error');
+          return;
+        }
+        setShowModal(true);
+      };
+
+      const confirmSubmit = () => {
+        onRegisterPlayer({ name, level, matches: [], points: 0, wins: 0, losses: 0, gamesWon: 0 });
+        setName("");
+        setLevel("A");
+        setShowModal(false);
+        addNotification(`Jugador ${name} registrado`, 'success');
+      };
+
+      return (
+        <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+          <h2 className="text-2xl font-bold mb-4">Registrar Jugador</h2>
+          <form onSubmit={handleSubmit}>
+            <div className="mb-4">
+              <label className="block mb-1">Nombre:</label>
+              <input
+                type="text"
+                placeholder="Nombre del jugador"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full p-2 border rounded"
+                required
+                minLength="3"
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block mb-1">Nivel:</label>
+              <select
+                value={level}
+                onChange={(e) => setLevel(e.target.value)}
+                className="w-full p-2 border rounded"
+              >
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+                <option value="D">D</option>
+                <option value="E">E</option>
+                <option value="F">F</option>
+              </select>
+            </div>
+            <button
+              type="submit"
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            >
+              Registrar
+            </button>
+          </form>
+          
+          <Modal
+            isOpen={showModal}
+            onClose={() => setShowModal(false)}
+            onConfirm={confirmSubmit}
+            title="Confirmar registro"
+          >
+            <p>¿Registrar a {name} con nivel {level}?</p>
+          </Modal>
+        </div>
+      );
+    };
+
+    // 8. TournamentForm
+    const TournamentForm = ({ players, onCreateTournament }) => {
+      const [name, setName] = React.useState("");
+      const [category, setCategory] = React.useState("A");
+      const [sport, setSport] = React.useState("Tenis");
+      const [sets, setSets] = React.useState("1");
+      const [type, setType] = React.useState("groups4");
+      const [pointsPerWin, setPointsPerWin] = React.useState("2");
+      const [selectedPlayers, setSelectedPlayers] = React.useState([]);
+      const [showModal, setShowModal] = React.useState(false);
+      const { addNotification } = useNotification();
+
+      const levelOrder = ["A", "B", "C", "D", "E", "F"];
+      const filteredPlayers = players.filter(p => levelOrder.indexOf(p.level) >= levelOrder.indexOf(category));
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        setShowModal(true);
+      };
+
+      const confirmSubmit = () => {
+        const minPlayers = type === "groups3" ? 3 : type === "groups4" ? 4 : 2;
+        if (selectedPlayers.length < minPlayers) {
+          addNotification(`Selecciona al menos ${minPlayers} jugadores`, 'error');
+          setShowModal(false);
+          return;
+        }
+        
+        const tournament = {
+          name,
+          category,
+          sport,
+          sets: parseInt(sets),
+          type,
+          pointsPerWin: parseInt(pointsPerWin),
+          players: selectedPlayers,
+          groups: [],
+          knockout: []
+        };
+
+        if (type === "knockout") {
+          tournament.knockout = generateKnockout(selectedPlayers);
+        } else {
+          tournament.groups = generateGroups(selectedPlayers, type);
+        }
+
+        onCreateTournament(tournament);
+        setName("");
+        setCategory("A");
+        setSport("Tenis");
+        setSets("1");
+        setType("groups4");
+        setPointsPerWin("2");
+        setSelectedPlayers([]);
+        setShowModal(false);
+        addNotification(`Torneo ${name} creado`, 'success');
+      };
+
+      const generateKnockout = (players) => {
+        let currentRound = [...players].sort(() => Math.random() - 0.5);
+        const phases = [];
+        
+        while (currentRound.length > 1) {
+          const nextRound = [];
+          for (let i = 0; i < currentRound.length; i += 2) {
+            if (currentRound[i + 1]) {
+              nextRound.push({ player1: currentRound[i], player2: currentRound[i + 1], result: null });
+            } else {
+              nextRound.push({ player1: currentRound[i], player2: null, result: { winner: 1 } });
+            }
+          }
+          
+          phases.unshift({
+            name: getPhaseName(currentRound.length),
+            matches: nextRound
+          });
+          
+          currentRound = nextRound.map(m => m.result?.winner === 1 ? m.player1 : m.result?.winner === 2 ? m.player2 : null).filter(Boolean);
+        }
+        
+        return phases;
+      };
+
+      const generateGroups = (players, type) => {
+        const groupSize = type === "groups3" ? 3 : 4;
+        const shuffledPlayers = [...players].sort((a, b) => {
+          const levelDiff = levelOrder.indexOf(a.level) - levelOrder.indexOf(b.level);
+          return Math.random() > 0.5 ? levelDiff : -levelDiff;
+        });
+        
+        const groups = [];
+        for (let i = 0; i < shuffledPlayers.length; i += groupSize) {
+          const groupPlayers = shuffledPlayers.slice(i, i + groupSize);
+          if (groupPlayers.length >= 2) {
+            const matches = groupPlayers.reduce((acc, p1, i) => acc.concat(
+                groupPlayers.slice(i + 1).map(p2 => ({
+                    player1: p1.name, 
+                    player2: p2.name, 
+                    result: null 
+                }))
+                ), []);
+            
+            groups.push({ 
+              id: groups.length + 1, 
+              players: groupPlayers.map(p => p.name), 
+              matches 
+            });
+          }
+        }
+        return groups;
+      };
+
+      const getPhaseName = (numPlayers) => {
+        if (numPlayers <= 2) return "Final";
+        if (numPlayers <= 4) return "Semifinales";
+        if (numPlayers <= 8) return "Cuartos";
+        if (numPlayers <= 16) return "Octavos";
+        return "Ronda de " + numPlayers;
+      };
+
+      return (
+        <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+          <h2 className="text-2xl font-bold mb-4">Crear Torneo</h2>
+          <form onSubmit={handleSubmit}>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block mb-1">Nombre del torneo:</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full p-2 border rounded"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block mb-1">Categoría:</label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full p-2 border rounded"
+                >
+                  <option value="A">Categoría A</option>
+                  <option value="B">Categoría B</option>
+                  <option value="C">Categoría C</option>
+                  <option value="D">Categoría D</option>
+                  <option value="E">Categoría E</option>
+                  <option value="F">Categoría F</option>
+                </select>
+              </div>
+              <div>
+                <label className="block mb-1">Deporte:</label>
+                <select
+                  value={sport}
+                  onChange={(e) => setSport(e.target.value)}
+                  className="w-full p-2 border rounded"
+                >
+                  <option value="Tenis">Tenis</option>
+                  <option value="Padel">Pádel</option>
+                </select>
+              </div>
+              <div>
+                <label className="block mb-1">Sets:</label>
+                <select
+                  value={sets}
+                  onChange={(e) => setSets(e.target.value)}
+                  className="w-full p-2 border rounded"
+                >
+                  <option value="1">1 Set</option>
+                  <option value="2">2 Sets</option>
+                </select>
+              </div>
+              <div>
+                <label className="block mb-1">Formato:</label>
+                <select
+                  value={type}
+                  onChange={(e) => setType(e.target.value)}
+                  className="w-full p-2 border rounded"
+                >
+                  <option value="groups4">Grupos de 4</option>
+                  <option value="groups3">Grupos de 3</option>
+                  <option value="knockout">Solo Eliminatorios</option>
+                </select>
+              </div>
+              <div>
+                <label className="block mb-1">Puntos por victoria:</label>
+                <input
+                  type="number"
+                  value={pointsPerWin}
+                  onChange={(e) => setPointsPerWin(e.target.value)}
+                  className="w-full p-2 border rounded"
+                  min="1"
+                  required
+                />
+              </div>
+            </div>
+            
+            <div className="mt-4">
+              <label className="block mb-1">Jugadores (selecciona varios con Ctrl/Cmd):</label>
+              <select
+                multiple
+                value={selectedPlayers}
+                onChange={(e) => setSelectedPlayers([...e.target.selectedOptions].map(o => o.value))}
+                className="w-full p-2 border rounded h-32"
+              >
+                {filteredPlayers.map((player, idx) => (
+                  <option key={idx} value={player.name}>{player.name} ({player.level})</option>
+                ))}
+              </select>
+              <p className="text-sm text-gray-500 mt-1">
+                Seleccionados: {selectedPlayers.length} jugadores
+              </p>
+            </div>
+            
+            <button
+              type="submit"
+              className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            >
+              Crear Torneo
+            </button>
+          </form>
+          
+          <Modal
+            isOpen={showModal}
+            onClose={() => setShowModal(false)}
+            onConfirm={confirmSubmit}
+            title="Confirmar creación de torneo"
+          >
+            <p>¿Crear torneo <strong>{name}</strong> con {selectedPlayers.length} jugadores?</p>
+            <p className="mt-2">Formato: {{
+              groups4: "Grupos de 4",
+              groups3: "Grupos de 3",
+              knockout: "Eliminatorias"
+            }[type]}</p>
+          </Modal>
+        </div>
+      );
+    };
+
+    // 9. MatchCard
+    const MatchCard = ({ match, onUpdateResult, sets, tournament, editable = true }) => {
+      const [set1P1, setSet1P1] = React.useState(match.result?.set1?.p1?.toString() || "");
+      const [set1P2, setSet1P2] = React.useState(match.result?.set1?.p2?.toString() || "");
+      const [set2P1, setSet2P1] = React.useState(match.result?.set2?.p1?.toString() || "");
+      const [set2P2, setSet2P2] = React.useState(match.result?.set2?.p2?.toString() || "");
+      const [tiebreak, setTiebreak] = React.useState(match.result?.tiebreak?.toString() || "");
+      const [showModal, setShowModal] = React.useState(false);
+      const [isValid, setIsValid] = React.useState(true);
+      const { addNotification } = useNotification();
+
+      const set1Winner = set1P1 && set1P2 ? 
+        (parseInt(set1P1) > parseInt(set1P2) ? 1 : 2 ): 
+        null;
+      
+      const set2Winner = set2P1 && set2P2 ? 
+        (parseInt(set2P1) > parseInt(set2P2) ? 1 : 2 ): 
+        null;
+
+      const handleResult = () => {
+        if (!match.player2 && !match.result) {
+          onUpdateResult(match, { winner: 1 }, tournament);
+          addNotification(`${match.player1} avanza por bye`, 'info');
+          return;
+        }
+        setShowModal(true);
+      };
+
+      const determineSetWinner = (set, tiebreakValue) => {
+        if (set.p1 === 6 && set.p2 < 6) return 1;
+        if (set.p2 === 6 && set.p1 < 6) return 2;
+        if (set.p1 === 7 && set.p2 === 6) return 1;
+        if (set.p2 === 7 && set.p1 === 6) return 2;
+        if (set.p1 === 6 && set.p2 === 6 && tiebreakValue >= 7) {
+          return (tiebreakValue - (tiebreakValue > 7 ? 5 : 7) >= 2) ? 1 : 2;
+        }
+        return null;
+      };
+
+      const determineWinner = (res, numSets) => {
+        if (!res.set1) return null;
+        
+        const set1Winner = determineSetWinner(res.set1, res.tiebreak);
+        if (numSets === 1) return set1Winner;
+        if (!res.set2) return null;
+        
+        const set2Winner = determineSetWinner(res.set2, res.tiebreak);
+        
+        if (set1Winner && set2Winner) {
+          if (set1Winner === set2Winner) return set1Winner;
+          return res.tiebreak >= 10 && (res.tiebreak - (res.tiebreak > 10 ? 8 : 10) >= 2) ? 1 : 2;
+        }
+        return null;
+      };
+
+      const confirmResult = () => {
+        const newResult = {};
+        if (set1P1 && set1P2) newResult.set1 = { 
+          p1: parseInt(set1P1), 
+          p2: parseInt(set1P2) 
+        };
+        if (sets === 2 && set2P1 && set2P2) newResult.set2 = { 
+          p1: parseInt(set2P1), 
+          p2: parseInt(set2P2) 
+        };
+        if (tiebreak) newResult.tiebreak = parseInt(tiebreak);
+
+        const winner = determineWinner(newResult, sets);
+        if (winner) {
+          onUpdateResult(match, { ...newResult, winner }, tournament);
+          setShowModal(false);
+          setIsValid(true);
+          addNotification(
+            `Resultado guardado: ${match.player1} vs ${match.player2 || 'Bye'}`,
+            'success'
+          );
+        } else {
+          setIsValid(false);
+          addNotification("Resultado inválido. Verifica los games y tiebreaks.", 'error');
+        }
+      };
+
+      const restrictGames = (value) => {
+        const num = parseInt(value) || 0;
+        return Math.min(Math.max(num, 0), 7).toString();
+      };
+
+      const restrictTiebreak = (value) => {
+        const num = parseInt(value) || 0;
+        return Math.min(Math.max(num, 0), 20).toString();
+      };
+
+      const needsTiebreak = (setP1, setP2) => setP1 === "6" && setP2 === "6";
+
+      const currentResultText = match.result ? (
+        <div className="text-sm text-gray-600 mt-1">
+          <p>Resultado actual:</p>
+          <p>Set 1: {match.result.set1?.p1 || '?'}-{match.result.set1?.p2 || '?'}</p>
+          {sets === 2 && <p>Set 2: {match.result.set2?.p1 || '?'}-{match.result.set2?.p2 || '?'}</p>}
+          {match.result.tiebreak && <p>Tiebreak: {match.result.tiebreak}</p>}
+        </div>
+      ) : null;
+
+      const renderTiebreakInput = () => {
+        const needsTb = (sets === 1 && needsTiebreak(set1P1, set1P2)) || 
+                       (sets === 2 && ((needsTiebreak(set1P1, set1P2) && !set2P1 && !set2P2) || 
+                                      (needsTiebreak(set2P1, set2P2) && !set1P1 && !set1P2) || 
+                                      (set1Winner && set2Winner && set1Winner !== set2Winner)));
+        
+        if (!needsTb) return null;
+
+        return (
+          <div className="mt-2">
+            <label className="text-xs text-gray-500">
+              {sets === 1 || (sets === 2 && !set1Winner) ? "Tiebreak (7)" : "Tiebreak (10)"}
+            </label>
+            <input
+              type="number"
+              placeholder={sets === 1 || (sets === 2 && !set1Winner) ? "7" : "10"}
+              value={tiebreak}
+              onChange={(e) => setTiebreak(restrictTiebreak(e.target.value))}
+              className={`w-16 p-1 border rounded ${!isValid && !tiebreak ? 'border-red-500' : ''}`}
+              min="0"
+              max="20"
+            />
+          </div>
+        );
+      };
+
+      return (
+        <div className="bg-gray-100 p-4 rounded-lg mb-2">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="font-medium">
+                {match.player1} vs {match.player2 || "Bye"} - 
+                <span className="ml-1">
+                  {match.result?.winner ? (
+                    match.result.winner === 1 ? (
+                      <span className="text-green-600">{match.player1} gana</span>
+                    ) : (
+                      <span className="text-green-600">{match.player2} gana</span>
+                    )
+                  ) : (
+                    <span className="text-yellow-600">Pendiente</span>
+                  )}
+                </span>
+              </p>
+              {currentResultText}
+            </div>
+            {editable && !match.player2 && match.result?.winner === 1 ? (
+              <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-sm">
+                Avanza por Bye
+              </span>
+            ) : null}
+          </div>
+          
+          {editable && (match.player2 || !match.result) && (
+            <div className="mt-3">
+              <div className="flex items-center space-x-4">
+                <div className="flex space-x-2">
+                  <div>
+                    <label className="text-xs text-gray-500">Set 1 P1</label>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      value={set1P1}
+                      onChange={(e) => setSet1P1(restrictGames(e.target.value))}
+                      className={`w-16 p-1 border rounded ${!isValid && !set1P1 ? 'border-red-500' : ''}`}
+                      min="0"
+                      max="7"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500">Set 1 P2</label>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      value={set1P2}
+                      onChange={(e) => setSet1P2(restrictGames(e.target.value))}
+                      className={`w-16 p-1 border rounded ${!isValid && !set1P2 ? 'border-red-500' : ''}`}
+                      min="0"
+                      max="7"
+                    />
+                  </div>
+                </div>
+                
+                {sets === 2 && (
+                  <div className="flex space-x-2">
+                    <div>
+                      <label className="text-xs text-gray-500">Set 2 P1</label>
+                      <input
+                        type="number"
+                        placeholder="0"
+                        value={set2P1}
+                        onChange={(e) => setSet2P1(restrictGames(e.target.value))}
+                        className={`w-16 p-1 border rounded ${!isValid && !set2P1 ? 'border-red-500' : ''}`}
+                        min="0"
+                        max="7"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500">Set 2 P2</label>
+                      <input
+                        type="number"
+                        placeholder="0"
+                        value={set2P2}
+                        onChange={(e) => setSet2P2(restrictGames(e.target.value))}
+                        className={`w-16 p-1 border rounded ${!isValid && !set2P2 ? 'border-red-500' : ''}`}
+                        min="0"
+                        max="7"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {renderTiebreakInput()}
+              
+              <button 
+                onClick={handleResult} 
+                className="mt-2 bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
+              >
+                {match.result?.winner ? "Actualizar resultado" : "Guardar resultado"}
+              </button>
+              
+              <Modal
+                isOpen={showModal}
+                onClose={() => {
+                  setShowModal(false);
+                  setIsValid(true);
+                }}
+                onConfirm={confirmResult}
+                title="Confirmar resultado"
+              >
+                <p>¿Guardar este resultado?</p>
+                <div className="mt-2 bg-gray-100 p-2 rounded">
+                  <p>Set 1: {set1P1 || '0'}-{set1P2 || '0'}</p>
+                  {sets === 2 && <p>Set 2: {set2P1 || '0'}-{set2P2 || '0'}</p>}
+                  {tiebreak && <p>Tiebreak: {tiebreak}</p>}
+                </div>
+                {match.result?.winner && (
+                  <p className="mt-2 text-sm text-yellow-600">
+                    Advertencia: Esto sobrescribirá el resultado existente.
+                  </p>
+                )}
+              </Modal>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // 10. GroupCard
+    const GroupCard = ({ group, onUpdateResult, sets, tournament }) => {
+      const matches = group.matches || [];
+      
+      const standings = group.players.map(player => {
+        const playerMatches = matches.filter(m => 
+          m.player1 === player || m.player2 === player
+        );
+        
+        const wins = playerMatches.filter(m => 
+          (m.player1 === player && m.result?.winner === 1) || 
+          (m.player2 === player && m.result?.winner === 2)
+        ).length;
+        
+        const losses = playerMatches.length - wins;
+        
+        const gamesWon = playerMatches.reduce((acc, m) => {
+          if (!m.result) return acc;
+          if (m.player1 === player) {
+            return acc + (m.result.set1?.p1 || 0) + (m.result.set2?.p1 || 0);
+          }
+          if (m.player2 === player) {
+            return acc + (m.result.set1?.p2 || 0) + (m.result.set2?.p2 || 0);
+          }
+          return acc;
+        }, 0);
+        
+        const gamesLost = playerMatches.reduce((acc, m) => {
+          if (!m.result) return acc;
+          if (m.player1 === player) {
+            return acc + (m.result.set1?.p2 || 0) + (m.result.set2?.p2 || 0);
+          }
+          if (m.player2 === player) {
+            return acc + (m.result.set1?.p1 || 0) + (m.result.set2?.p1 || 0);
+          }
+          return acc;
+        }, 0);
+        
+        return {
+          name: player,
+          matches: playerMatches.length,
+          wins,
+          losses,
+          points: wins * tournament.pointsPerWin,
+          gamesWon,
+          gamesLost,
+          gamesDiff: gamesWon - gamesLost
+        };
+      }).sort((a, b) => 
+        b.points - a.points || 
+        b.gamesDiff - a.gamesDiff || 
+        b.gamesWon - a.gamesWon
+      );
+
+      return (
+        <div className="bg-white p-6 rounded-lg shadow-md mb-4">
+          <h4 className="text-lg font-semibold mb-2">Grupo {group.id}</h4>
+          
+          <div className="overflow-x-auto mb-6">
+            <table className="min-w-full border">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="p-2 border text-left">Jugador</th>
+                  <th className="p-2 border text-center">PJ</th>
+                  <th className="p-2 border text-center">PG</th>
+                  <th className="p-2 border text-center">PP</th>
+                  <th className="p-2 border text-center">Puntos</th>
+                  <th className="p-2 border text-center">GF</th>
+                  <th className="p-2 border text-center">GC</th>
+                  <th className="p-2 border text-center">+/-</th>
+                </tr>
+              </thead>
+              <tbody>
+                {standings.map((player, idx) => (
+                  <tr 
+                    key={idx} 
+                    className={`${idx < 2 ? 'bg-green-50' : ''} ${idx === standings.length - 1 ? 'bg-red-50' : ''}`}
+                  >
+                    <td className="p-2 border">{player.name}</td>
+                    <td className="p-2 border text-center">{player.matches}</td>
+                    <td className="p-2 border text-center">{player.wins}</td>
+                    <td className="p-2 border text-center">{player.losses}</td>
+                    <td className="p-2 border text-center font-bold">{player.points}</td>
+                    <td className="p-2 border text-center">{player.gamesWon}</td>
+                    <td className="p-2 border text-center">{player.gamesLost}</td>
+                    <td className="p-2 border text-center">{player.gamesDiff > 0 ? `+${player.gamesDiff}` : player.gamesDiff}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          
+          <h5 className="text-md font-semibold mb-2">Partidos del Grupo</h5>
+          {matches.length > 0 ? (
+            <div className="space-y-2">
+              {matches.map((match, idx) => (
+                <MatchCard 
+                  key={idx} 
+                  match={match} 
+                  onUpdateResult={onUpdateResult} 
+                  sets={sets} 
+                  tournament={tournament} 
+                />
+              ))}
+            </div>
+          ) : (
+            <p>No hay partidos definidos para este grupo.</p>
+          )}
+        </div>
+      );
+    };
+
+    // 11. KnockoutSlider
+    const KnockoutSlider = ({ knockout, onUpdateResult, sets, tournament }) => {
+      const [currentSlide, setCurrentSlide] = React.useState(0);
+      
+      if (knockout.length === 0) return null;
+
+      return (
+        <div className="mt-6">
+          <div className="flex justify-between items-center mb-4">
+            <h4 className="text-lg font-semibold">Fases Eliminatorias</h4>
+            {knockout.length > 1 && (
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setCurrentSlide(Math.max(0, currentSlide - 1))}
+                  className="bg-gray-800 text-white p-2 rounded-full"
+                  disabled={currentSlide === 0}
+                >
+                  &lt;
+                </button>
+                <button
+                  onClick={() => setCurrentSlide(Math.min(knockout.length - 1, currentSlide + 1))}
+                  className="bg-gray-800 text-white p-2 rounded-full"
+                  disabled={currentSlide === knockout.length - 1}
+                >
+                  &gt;
+                </button>
+              </div>
+            )}
+          </div>
+          
+          <div className="relative overflow-hidden">
+            <div
+              className="flex transition-transform duration-300"
+              style={{ 
+                transform: `translateX(-${currentSlide * 100}%)`,
+                width: `${knockout.length * 100}%`
+              }}
+            >
+              {knockout.map((phase, idx) => (
+                <div key={idx} className="w-full flex-shrink-0 px-2">
+                  <div className="bg-white p-4 rounded-lg shadow">
+                    <h5 className="text-md font-semibold mb-3 text-center">{phase.name}</h5>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {phase.matches.map((match, matchIdx) => (
+                        <MatchCard
+                          key={matchIdx}
+                          match={match}
+                          onUpdateResult={onUpdateResult}
+                          sets={sets}
+                          tournament={tournament}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // 12. TournamentCard
+    const TournamentCard = ({ tournament, onUpdateResult, onDelete }) => {
+      const { addNotification } = useNotification();
+      const [showDeleteModal, setShowDeleteModal] = React.useState(false);
+      
+      const getKnockoutPhase = () => {
+        if (tournament.knockout.length > 0) return tournament.knockout;
+        if (tournament.type !== "knockout") {
+          const qualified = tournament.groups.flatMap(group => {
+            const standings = group.players.map(player => ({
+              name: player,
+              points: group.matches.filter(m => 
+                (m.player1 === player && m.result?.winner === 1) || 
+                (m.player2 === player && m.result?.winner === 2)
+              ).length * tournament.pointsPerWin,
+              gamesWon: group.matches.reduce((acc, m) => {
+                if (m.result) {
+                  if (m.player1 === player) return acc + (m.result.set1?.p1 || 0) + (m.result.set2?.p1 || 0);
+                  if (m.player2 === player) return acc + (m.result.set1?.p2 || 0) + (m.result.set2?.p2 || 0);
+                }
+                return acc;
+              }, 0)
+            })).sort((a, b) => b.points - a.points || b.gamesWon - a.gamesWon);
+            
+            return standings.slice(0, 2).map(s => s.name);
+          });
+
+          const phases = [];
+          let currentRound = qualified;
+          
+          while (currentRound.length > 1) {
+            const nextRound = [];
+            for (let i = 0; i < currentRound.length; i += 2) {
+              if (currentRound[i + 1]) {
+                nextRound.push({ 
+                  player1: currentRound[i], 
+                  player2: currentRound[i + 1], 
+                  result: null 
+                });
+              }
+            }
+            
+            phases.unshift({
+              name: getPhaseName(currentRound.length),
+              matches: nextRound
+            });
+            
+            currentRound = nextRound.map(m => 
+              m.result?.winner === 1 ? m.player1 : 
+              m.result?.winner === 2 ? m.player2 : 
+              null
+            ).filter(Boolean);
+          }
+          
+          return phases;
+        }
+        return [];
+      };
+
+      const getPhaseName = (numPlayers) => {
+        if (numPlayers <= 2) return "Final";
+        if (numPlayers <= 4) return "Semifinales";
+        if (numPlayers <= 8) return "Cuartos";
+        return "Ronda de " + numPlayers;
+      };
+
+      const knockout = getKnockoutPhase();
+
+      const handleDelete = () => {
+        setShowDeleteModal(true);
+      };
+
+      const confirmDelete = () => {
+        onDelete(tournament.name);
+        addNotification(`Torneo "${tournament.name}" eliminado`, 'info');
+        setShowDeleteModal(false);
+      };
+
+      return (
+        <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h3 className="text-xl font-semibold">{tournament.name}</h3>
+              <p className="text-gray-600">
+                {tournament.sport} - Categoría {tournament.category} - {tournament.sets} Set{tournament.sets > 1 ? 's' : ''}
+              </p>
+            </div>
+            <button
+              onClick={handleDelete}
+              className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+            >
+              Eliminar Torneo
+            </button>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-4 mb-4">
+            <div className="bg-blue-50 p-3 rounded">
+              <p className="text-sm text-blue-800">Formato</p>
+              <p className="font-medium">
+                {tournament.type === 'groups4' ? 'Grupos de 4' : 
+                 tournament.type === 'groups3' ? 'Grupos de 3' : 'Eliminatorias'}
+              </p>
+            </div>
+            <div className="bg-green-50 p-3 rounded">
+              <p className="text-sm text-green-800">Jugadores</p>
+              <p className="font-medium">{tournament.players.length}</p>
+            </div>
+            <div className="bg-yellow-50 p-3 rounded">
+              <p className="text-sm text-yellow-800">Puntos por victoria</p>
+              <p className="font-medium">{tournament.pointsPerWin}</p>
+            </div>
+          </div>
+          
+          {tournament.type !== "knockout" && (
+            <>
+              <h4 className="text-lg mb-3 font-medium">Fase de Grupos</h4>
+              {tournament.groups.length > 0 ? (
+                <div className="space-y-6">
+                  {tournament.groups.map((group, idx) => (
+                    <GroupCard 
+                      key={idx} 
+                      group={group} 
+                      onUpdateResult={onUpdateResult} 
+                      sets={tournament.sets} 
+                      tournament={tournament} 
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p>No hay grupos definidos.</p>
+              )}
+            </>
+          )}
+          
+          {(tournament.type === "knockout" || knockout.length > 0) && (
+            <KnockoutSlider 
+              knockout={tournament.type === "knockout" ? tournament.knockout : knockout} 
+              onUpdateResult={onUpdateResult} 
+              sets={tournament.sets} 
+              tournament={tournament} 
+            />
+          )}
+          
+          <Modal
+            isOpen={showDeleteModal}
+            onClose={() => setShowDeleteModal(false)}
+            onConfirm={confirmDelete}
+            title="Confirmar eliminación"
+          >
+            <p>¿Estás seguro de eliminar el torneo <strong>{tournament.name}</strong>?</p>
+            <p className="mt-2 text-red-600">Esta acción no se puede deshacer.</p>
+          </Modal>
+        </div>
+      );
+    };
+
+    // 13. ProfileCard
+    const ProfileCard = ({ player, onDelete }) => {
+      const [showDeleteModal, setShowDeleteModal] = React.useState(false);
+      const { addNotification } = useNotification();
+      
+      const stats = React.useMemo(() => {
+        const totalMatches = player.matches.length;
+        const wins = player.wins;
+        const losses = player.losses;
+        const winRate = totalMatches > 0 ? (wins / totalMatches * 100).toFixed(1) : 0;
+        
+        const streak = player.matches.reduce((acc, m) => {
+          if (!m.result?.winner) return acc;
+          return (m.result.winner === 1 && m.player1 === player.name) || 
+                 (m.result.winner === 2 && m.player2 === player.name) ? acc + 1 : 0;
+        }, 0);
+        
+        const lastMatches = [...player.matches]
+          .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
+          .slice(0, 5)
+          .map(m => ({
+            ...m,
+            result: m.result ? (
+              (m.result.winner === 1 && m.player1 === player.name) || 
+              (m.result.winner === 2 && m.player2 === player.name) ? 'W' : 'L'
+            ) : '-'
+          }));
+        
+        return { totalMatches, wins, losses, winRate, streak, lastMatches };
+      }, [player]);
+
+      const handleDelete = () => {
+        setShowDeleteModal(true);
+      };
+
+      const confirmDelete = () => {
+        onDelete(player.name);
+        addNotification(`Jugador "${player.name}" eliminado`, 'info');
+        setShowDeleteModal(false);
+      };
+
+      return (
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h3 className="text-xl font-semibold">{player.name}</h3>
+              <p className="text-gray-600">Nivel {player.level}</p>
+            </div>
+            <button
+              onClick={handleDelete}
+              className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+            >
+              Eliminar
+            </button>
+          </div>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <StatCard title="Puntos" value={player.points} color="blue" />
+            <StatCard title="Partidos" value={stats.totalMatches} color="gray" />
+            <StatCard title="Victorias" value={stats.wins} color="green" />
+            <StatCard title="Derrotas" value={stats.losses} color="red" />
+            <StatCard title="% Victorias" value={`${stats.winRate}%`} color="purple" />
+            <StatCard title="Racha actual" value={stats.streak} color="yellow" />
+            <StatCard title="Games ganados" value={player.gamesWon} color="teal" />
+          </div>
+          
+          <div className="mb-6">
+            <h4 className="text-lg font-medium mb-2">Últimos 5 partidos</h4>
+            <div className="flex space-x-2">
+              {stats.lastMatches.map((match, idx) => (
+                <div 
+                  key={idx} 
+                  className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    match.result === 'W' ? 'bg-green-100 text-green-800' :
+                    match.result === 'L' ? 'bg-red-100 text-red-800' : 'bg-gray-100'
+                  }`}
+                  title={`vs ${match.player1 === player.name ? match.player2 : match.player1}`}
+                >
+                  {match.result}
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          <div>
+            <h4 className="text-lg font-medium mb-2">Historial de Partidos</h4>
+            {player.matches.length > 0 ? (
+              <div className="space-y-2">
+                {player.matches.map((match, idx) => (
+                  <MatchCard 
+                    key={idx} 
+                    match={match} 
+                    onUpdateResult={() => {}} 
+                    editable={false} 
+                    sets={1} 
+                    tournament={{}} 
+                  />
+                ))}
+              </div>
+            ) : (
+              <p>No hay partidos registrados aún.</p>
+            )}
+          </div>
+          
+          <Modal
+            isOpen={showDeleteModal}
+            onClose={() => setShowDeleteModal(false)}
+            onConfirm={confirmDelete}
+            title="Confirmar eliminación"
+          >
+            <p>¿Estás seguro de eliminar al jugador <strong>{player.name}</strong>?</p>
+            <p className="mt-2 text-red-600">
+              Esto también lo eliminará de todos los torneos en los que participe.
+            </p>
+          </Modal>
+        </div>
+      );
+    };
+
+    const StatCard = ({ title, value, color = 'gray' }) => {
+      const colorClasses = {
+        blue: 'bg-blue-50 text-blue-800',
+        green: 'bg-green-50 text-green-800',
+        red: 'bg-red-50 text-red-800',
+        yellow: 'bg-yellow-50 text-yellow-800',
+        purple: 'bg-purple-50 text-purple-800',
+        teal: 'bg-teal-50 text-teal-800',
+        gray: 'bg-gray-50 text-gray-800'
+      };
+      
+      return (
+        <div className={`p-3 rounded ${colorClasses[color]}`}>
+          <p className="text-sm">{title}</p>
+          <p className="text-2xl font-bold">{value}</p>
+        </div>
+      );
+    };
+
+    // 14. DataManager
+    const DataManager = () => {
+      const { addNotification } = useNotification();
+      
+      const exportData = () => {
+        try {
+          const data = {
+            players: JSON.parse(localStorage.getItem('players')),
+            tournaments: JSON.parse(localStorage.getItem('tournaments'))
+          };
+          
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `tennis-tournament-backup-${new Date().toISOString().slice(0, 10)}.json`;
+          a.click();
+          addNotification('Datos exportados correctamente', 'success');
+        } catch (error) {
+          addNotification('Error al exportar datos', 'error');
+          console.error(error);
+        }
+      };
+
+      const importData = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const data = JSON.parse(event.target.result);
+            
+            if (!data.players || !data.tournaments) {
+              addNotification('Archivo no válido', 'error');
+              return;
+            }
+            
+            localStorage.setItem('players', JSON.stringify(data.players));
+            localStorage.setItem('tournaments', JSON.stringify(data.tournaments));
+            addNotification('Datos importados correctamente', 'success');
+            
+            setTimeout(() => window.location.reload(), 1000);
+          } catch (error) {
+            addNotification('Error al importar datos', 'error');
+            console.error(error);
+          }
+        };
+        reader.readAsText(file);
+      };
+
+      return (
+        <div className="bg-gray-100 p-4 rounded-lg mb-8">
+          <h3 className="text-lg font-semibold mb-3">Gestión de Datos</h3>
+          <div className="flex flex-wrap gap-3">
+            <button 
+              onClick={exportData}
+              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+            >
+              Exportar Datos
+            </button>
+            
+            <label className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 cursor-pointer">
+              Importar Datos
+              <input 
+                type="file" 
+                accept=".json" 
+                onChange={importData} 
+                className="hidden" 
+              />
+            </label>
+          </div>
+          <p className="text-sm text-gray-600 mt-2">
+            Guarda una copia de seguridad de todos los jugadores y torneos.
+          </p>
+        </div>
+      );
+    };
+
+    // 15. App principal
+    const App = () => {
+      const [players, setPlayers] = React.useState(() => {
+        const saved = localStorage.getItem('players');
+        return saved ? JSON.parse(saved) : [];
+      });
+      
+      const [tournaments, setTournaments] = React.useState(() => {
+        const saved = localStorage.getItem('tournaments');
+        return saved ? JSON.parse(saved) : [];
+      });
+      
+      const [selectedTournament, setSelectedTournament] = React.useState(null);
+      const [selectedPlayer, setSelectedPlayer] = React.useState(null);
+      const [showLogin, setShowLogin] = React.useState(false);
+      
+      React.useEffect(() => {
+        localStorage.setItem('players', JSON.stringify(players));
+        localStorage.setItem('tournaments', JSON.stringify(tournaments));
+      }, [players, tournaments]);
+
+      const registerPlayer = (player) => {
+        setPlayers(prev => [...prev, player]);
+      };
+
+      const createTournament = (tournament) => {
+        setTournaments(prev => [...prev, tournament]);
+        setSelectedTournament(tournament.name);
+      };
+
+      const updateResult = (match, result, tournament) => {
+        setPlayers(prev => prev.map(p => {
+          if (p.name === match.player1 || p.name === match.player2) {
+            const updatedMatches = match.result?.winner ?
+              p.matches.map(m => 
+                m.player1 === match.player1 && m.player2 === match.player2 ? 
+                { ...m, result } : m
+              ) :
+              [...p.matches, { 
+                player1: match.player1, 
+                player2: match.player2, 
+                result,
+                date: new Date().toISOString()
+              }];
+            
+            if (!match.result?.winner) {
+              const isWinner = (result.winner === 1 && p.name === match.player1) || 
+                              (result.winner === 2 && p.name === match.player2);
+              const gamesWon = p.name === match.player1 ? 
+                (result.set1?.p1 || 0) + (result.set2?.p1 || 0) : 
+                (result.set1?.p2 || 0) + (result.set2?.p2 || 0);
+              
+              return {
+                ...p,
+                matches: updatedMatches,
+                points: p.points + (isWinner ? tournament.pointsPerWin : 0),
+                wins: isWinner ? p.wins + 1 : p.wins,
+                losses: !isWinner ? p.losses + 1 : p.losses,
+                gamesWon: p.gamesWon + gamesWon
+              };
+            }
+            
+            return { ...p, matches: updatedMatches };
+          }
+          return p;
+        }));
+
+        setTournaments(prev => prev.map(t => {
+          if (t.name !== tournament.name) return t;
+          
+          const updatedGroups = t.groups.map(group => ({
+            ...group,
+            matches: group.matches.map(m =>
+              m.player1 === match.player1 && m.player2 === match.player2 ? 
+              { ...m, result } : m
+            )
+          }));
+          
+          const updatedKnockout = t.knockout.map(phase => ({
+            ...phase,
+            matches: phase.matches.map(m =>
+              m.player1 === match.player1 && m.player2 === match.player2 ? 
+              { ...m, result } : m
+            )
+          }));
+          
+          return { ...t, groups: updatedGroups, knockout: updatedKnockout };
+        }));
+      };
+
+      const deleteTournament = (name) => {
+        setTournaments(prev => prev.filter(t => t.name !== name));
+        if (selectedTournament === name) setSelectedTournament(null);
+      };
+
+      const deletePlayer = (name) => {
+        setPlayers(prev => prev.filter(p => p.name !== name));
+        setTournaments(prev => prev.map(t => ({
+          ...t,
+          players: t.players.filter(p => p !== name),
+          groups: t.groups.map(g => ({
+            ...g,
+            players: g.players.filter(p => p !== name),
+            matches: g.matches.filter(m => 
+              m.player1 !== name && m.player2 !== name
+            )
+          })),
+          knockout: t.knockout.map(phase => ({
+            ...phase,
+            matches: phase.matches.filter(m => 
+              m.player1 !== name && m.player2 !== name
+            )
+          }))
+        })));
+        if (selectedPlayer?.name === name) setSelectedPlayer(null);
+      };
+
+      return (
+        <ErrorBoundary>
+          <AuthProvider>
+            <NotificationProvider>
+              <div className="min-h-screen bg-gray-50">
+                <NavBar />
+                
+                <div className="container mx-auto py-8">
+                  <DataManager />
+                  
+                  <div className="grid md:grid-cols-2 gap-8 mb-8">
+                    <div>
+                      <PlayerForm onRegisterPlayer={registerPlayer} />
+                    </div>
+                    <div>
+                      <TournamentForm 
+                        players={players} 
+                        onCreateTournament={createTournament} 
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="mb-8">
+                    <h2 className="text-2xl font-bold mb-4">Torneos Activos</h2>
+                    {tournaments.length > 0 ? (
+                      <>
+                        <div className="mb-4">
+                          <label className="block mb-1">Seleccionar torneo:</label>
+                          <select
+                            value={selectedTournament || ""}
+                            onChange={(e) => setSelectedTournament(e.target.value)}
+                            className="w-full p-2 border rounded"
+                          >
+                            <option value="">-- Selecciona un torneo --</option>
+                            {tournaments.map((tournament, idx) => (
+                              <option key={idx} value={tournament.name}>
+                                {tournament.name} ({{
+                                  groups4: "Grupos de 4",
+                                  groups3: "Grupos de 3",
+                                  knockout: "Eliminatorias"
+                                }[tournament.type]})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        
+                        {selectedTournament && (
+                          <TournamentCard
+                            tournament={tournaments.find(t => t.name === selectedTournament)}
+                            onUpdateResult={updateResult}
+                            onDelete={deleteTournament}
+                          />
+                        )}
+                      </>
+                    ) : (
+                      <p>No hay torneos activos.</p>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <h2 className="text-2xl font-bold mb-4">Perfil de Jugador</h2>
+                    <div className="mb-4">
+                      <label className="block mb-1">Seleccionar jugador:</label>
+                      <select
+                        value={selectedPlayer?.name || ""}
+                        onChange={(e) => setSelectedPlayer(
+                          players.find(p => p.name === e.target.value) || null
+                        )}
+                        className="w-full p-2 border rounded"
+                      >
+                        <option value="">-- Selecciona un jugador --</option>
+                        {players.map((player, idx) => (
+                          <option key={idx} value={player.name}>
+                            {player.name} ({player.level})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    {selectedPlayer && (
+                      <ProfileCard
+                        player={selectedPlayer}
+                        onDelete={deletePlayer}
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            </NotificationProvider>
+          </AuthProvider>
+        </ErrorBoundary>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+  
+  <style>
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fadeIn {
+      animation: fadeIn 0.3s ease-out;
+    }
+  </style>
+</body>
+</html>
